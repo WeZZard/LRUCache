@@ -5,7 +5,9 @@
 //  Created on 2019/4/9.
 //
 
-/// A Least-Recently Used Cache.
+// MARK: - LRUCache
+
+/// A Least-Recently Used Cache. Not thread-safe.
 ///
 public class LRUCache<Key: Hashable, Value> {
     internal var _bucketHead: _Bucket<Key, Value>
@@ -130,6 +132,123 @@ public class LRUCache<Key: Hashable, Value> {
         bucket.previous = nil
     }
 }
+
+// MARK: Collection
+
+public struct LRUCacheIndex<Key: Hashable, Value>: Comparable, Hashable {
+    internal let _impl: DictionaryIndex<Key, _Bucket<Key, Value>>
+    
+    internal init(impl: DictionaryIndex<Key, _Bucket<Key, Value>>) {
+        _impl = impl
+    }
+    
+    public static func < (lhs: LRUCacheIndex, rhs: LRUCacheIndex) -> Bool {
+        return lhs._impl < rhs._impl
+    }
+}
+
+extension LRUCache: Collection {
+    public typealias Index = LRUCacheIndex<Key, Value>
+    
+    public typealias Element = (key: Key, value: Value)
+    
+    public var startIndex: Index {
+        return LRUCacheIndex(impl: _bucketsForKeys.startIndex)
+    }
+    
+    public var endIndex: Index {
+        return LRUCacheIndex(impl: _bucketsForKeys.endIndex)
+    }
+    
+    public func index(after i: Index) -> Index {
+        return Index(impl: _bucketsForKeys.index(after: i._impl))
+    }
+    
+    public subscript(index: Index) -> Element {
+        let (_, bucket) = _bucketsForKeys[index._impl]
+        return bucket.keyValuePair
+    }
+}
+
+// MARK: Least-Recently Used View
+
+/// The least-recently used view of an `LRUCache` instance.
+///
+/// Iterator Invalidation
+/// =====================
+///
+/// The `LRUCache` class does not hornor COW (copy-on-write). This leads
+/// an `LRUCacheLeastRecentlyUsedView` instance which holds a strong
+/// reference to the cache instance doesn't make the cache instance to be
+/// copied when the cache instance is scheduled to be viewed in
+/// least-recently used and then wrriten.
+///
+/// You may think the variable `leastRecentlyUsedView` in following code
+/// returns `[1, 0]`, but it returns `[0, 1]`.
+///
+/// ```
+/// let cache = LRUCache<String, Int>(maxCount: 10)
+///
+/// cache.insertValue(0, forKey: "zero")
+///
+/// cache.insertValue(1, forKey: "one")
+///
+/// let leastRecentlyUsedView = cache.leastRecentlyUsedView
+///
+/// cache.value(forKey: "zero")
+///
+/// print(Array(leastRecentlyUsedView))
+/// ```
+///
+public struct LRUCacheLeastRecentlyUsedView<Key: Hashable, Value>: Sequence {
+    internal let _cache: LRUCache<Key, Value>
+    
+    public init(cache: LRUCache<Key, Value>) {
+        _cache = cache
+    }
+    
+    public typealias Iterator = LRUCacheLeastRecentlyUsedViewIterator<Key, Value>
+    
+    public __consuming func makeIterator() -> Iterator {
+        return Iterator(cache: _cache)
+    }
+}
+
+/// The least-recently used view iterator of an `LRUCache` instance.
+///
+public struct LRUCacheLeastRecentlyUsedViewIterator<Key: Hashable, Value>:
+    IteratorProtocol
+{
+    internal let _cache: LRUCache<Key, Value>
+    
+    internal unowned var current: _Bucket<Key, Value>
+    
+    public init(cache: LRUCache<Key, Value>) {
+        _cache = cache
+        current = _cache._bucketHead.next!
+    }
+    
+    public typealias Element = (key: Key, value: Value)
+    
+    public mutating func next() -> Element? {
+        if let keyValuePair = current.keyValuePair {
+            current = current.next!
+            return keyValuePair
+        }
+        return nil
+    }
+}
+
+extension LRUCache {
+    /// Returns a view of the cache which is a sequence of the stored
+    /// key-value pairs arranged in least-recently used order.
+    ///
+    public var leastRecentlyUsedView: LRUCacheLeastRecentlyUsedView<Key, Value> {
+        return LRUCacheLeastRecentlyUsedView(cache: self)
+    }
+}
+
+// MARK: - _Bucket
 
 internal class _Bucket<Key: Hashable, Value> {
     internal weak var previous: _Bucket?
