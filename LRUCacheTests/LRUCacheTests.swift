@@ -201,4 +201,26 @@ class LRUCacheTests: XCTestCase {
         XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketHead.next)
         XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketTail.previous!.previous)
     }
+    
+    // MARK: Least-Recently Used View
+    func testLeastRecentlyUsedView_returnsCacheStoredKeyValuePairsInLeastRecentlyUsedOrder() {
+        let cache = LRUCache<String, Int>()
+        
+        cache.insertValue(0, forKey: "zero")
+        cache.insertValue(1, forKey: "one")
+        
+        var leastRecentlyUsedView = Array(cache.leastRecentlyUsedView)
+        XCTAssertEqual(leastRecentlyUsedView[0].key, "one")
+        XCTAssertEqual(leastRecentlyUsedView[0].value, 1)
+        XCTAssertEqual(leastRecentlyUsedView[1].key, "zero")
+        XCTAssertEqual(leastRecentlyUsedView[1].value, 0)
+        
+        cache.value(forKey: "zero")
+        
+        leastRecentlyUsedView = Array(cache.leastRecentlyUsedView)
+        XCTAssertEqual(leastRecentlyUsedView[0].key, "zero")
+        XCTAssertEqual(leastRecentlyUsedView[0].value, 0)
+        XCTAssertEqual(leastRecentlyUsedView[1].key, "one")
+        XCTAssertEqual(leastRecentlyUsedView[1].value, 1)
+    }
 }
