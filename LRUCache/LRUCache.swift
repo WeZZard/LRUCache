@@ -10,10 +10,11 @@
 /// A Least-Recently Used Cache. Not thread-safe.
 ///
 public class LRUCache<Key: Hashable, Value> {
-    internal var _bucketHead: _Bucket<Key, Value>
-    internal var _bucketTail: _Bucket<Key, Value>
+    internal typealias _KeyValuePair = (key: Key, value: Value)
     
-    internal var _bucketsForKeys: [Key : _Bucket<Key, Value>]
+    internal var _bucketOffsetsForKeys: [Key : Int]
+    
+    internal let _storage: _LRUCacheBucketStorage<_KeyValuePair>
     
     /// The max key-value pairs can be stored in this cache. `0` means no
     /// limit.
@@ -22,11 +23,8 @@ public class LRUCache<Key: Hashable, Value> {
     
     public init(maxCount: Int = 0) {
         self.maxCount = maxCount
-        _bucketHead = .init()
-        _bucketTail = .init()
-        _bucketHead.next = _bucketTail
-        _bucketTail.previous = _bucketHead
-        _bucketsForKeys = [:]
+        _bucketOffsetsForKeys = [:]
+        _storage = _LRUCacheBucketStorage()
     }
     
     /// Inserts a `value` for `key` to the cache. Returns the old value
@@ -45,16 +43,12 @@ public class LRUCache<Key: Hashable, Value> {
     @discardableResult
     public func insertValue(_ value: Value, forKey key: Key) -> Value? {
         var oldValue: Value?
-        if let _bucket = _bucketsForKeys[key] {
-            oldValue = _bucket.keyValuePair.value
-            _bucket.keyValuePair = (key, value)
-            _removeBucket(_bucket)
-            _insertBucket(_bucket)
-        } else {
-            let _bucket = _Bucket(keyValuePair: (key, value))
-            _bucketsForKeys[key] = _bucket
-            _insertBucket(_bucket)
+        if let bucketOffset = _bucketOffsetsForKeys[key] {
+            let oldKeyValuePair = _storage.remove(at: bucketOffset)
+            oldValue = oldKeyValuePair.value
         }
+        let newBucketOffset = _storage.pushFront((key, value))
+        _bucketOffsetsForKeys[key] = newBucketOffset
         evictIfNeeded()
         return oldValue
     }
@@ -68,10 +62,10 @@ public class LRUCache<Key: Hashable, Value> {
     ///
     @discardableResult
     public func evictValue(forKey key: Key) -> Value? {
-        if let _bucket = _bucketsForKeys[key] {
-            _bucketsForKeys[key] = nil
-            _removeBucket(_bucket)
-            return _bucket.keyValuePair.value
+        if let bucketOffset = _bucketOffsetsForKeys[key] {
+            _bucketOffsetsForKeys[key] = nil
+            let (_, value) = _storage.remove(at: bucketOffset)
+            return value
         }
         return nil
     }
@@ -89,10 +83,11 @@ public class LRUCache<Key: Hashable, Value> {
     ///
     @discardableResult
     public func value(forKey key: Key) -> Value? {
-        if let _bucket = _bucketsForKeys[key] {
-            _removeBucket(_bucket)
-            _insertBucket(_bucket)
-            return _bucket.keyValuePair.value
+        if let bucketOffset = _bucketOffsetsForKeys[key] {
+            let keyValuePair = _storage.remove(at: bucketOffset)
+            let newBucketOffset = _storage.pushFront(keyValuePair)
+            _bucketOffsetsForKeys[key] = newBucketOffset
+            return keyValuePair.value
         }
         return nil
     }
@@ -103,42 +98,19 @@ public class LRUCache<Key: Hashable, Value> {
     public func evictIfNeeded() {
         guard maxCount > 0 else { return }
         
-        while _bucketsForKeys.count > maxCount {
-            let _bucket = _bucketTail.previous!
-            _removeBucket(_bucket)
-            _bucketsForKeys[_bucket.keyValuePair.key] = nil
+        while _bucketOffsetsForKeys.count > maxCount {
+            let (key, _) = _storage.popBack()
+            _bucketOffsetsForKeys[key] = nil
         }
-    }
-    
-    internal func _insertBucket(_ bucket: _Bucket<Key, Value>) {
-        let currentFirstBucket = _bucketHead.next!
-        
-        _bucketHead.next = bucket
-        bucket.previous = _bucketHead
-        
-        bucket.next = currentFirstBucket
-        currentFirstBucket.previous = bucket
-    }
-    
-    internal func _removeBucket(_ bucket: _Bucket<Key, Value>) {
-        let previous = bucket.previous!
-        
-        let next = bucket.next!
-        
-        previous.next = next
-        next.previous = previous
-        
-        bucket.next = nil
-        bucket.previous = nil
     }
 }
 
 // MARK: Collection
 
 public struct LRUCacheIndex<Key: Hashable, Value>: Comparable, Hashable {
-    internal let _impl: DictionaryIndex<Key, _Bucket<Key, Value>>
+    internal let _impl: DictionaryIndex<Key, Int>
     
-    internal init(impl: DictionaryIndex<Key, _Bucket<Key, Value>>) {
+    internal init(impl: DictionaryIndex<Key, Int>) {
         _impl = impl
     }
     
@@ -153,20 +125,20 @@ extension LRUCache: Collection {
     public typealias Element = (key: Key, value: Value)
     
     public var startIndex: Index {
-        return LRUCacheIndex(impl: _bucketsForKeys.startIndex)
+        return LRUCacheIndex(impl: _bucketOffsetsForKeys.startIndex)
     }
     
     public var endIndex: Index {
-        return LRUCacheIndex(impl: _bucketsForKeys.endIndex)
+        return LRUCacheIndex(impl: _bucketOffsetsForKeys.endIndex)
     }
     
     public func index(after i: Index) -> Index {
-        return Index(impl: _bucketsForKeys.index(after: i._impl))
+        return Index(impl: _bucketOffsetsForKeys.index(after: i._impl))
     }
     
     public subscript(index: Index) -> Element {
-        let (_, bucket) = _bucketsForKeys[index._impl]
-        return bucket.keyValuePair
+        let (_, bucketOffset) = _bucketOffsetsForKeys[index._impl]
+        return _storage._withMutableBucket(at: bucketOffset)[0].element!
     }
 }
 
@@ -221,19 +193,22 @@ public struct LRUCacheLeastRecentlyUsedViewIterator<Key: Hashable, Value>:
 {
     internal let _cache: LRUCache<Key, Value>
     
-    internal unowned var current: _Bucket<Key, Value>
+    internal var _currentBucketOffset: Int
     
     public init(cache: LRUCache<Key, Value>) {
         _cache = cache
-        current = _cache._bucketHead.next!
+        _currentBucketOffset = _cache._storage._headOffset
     }
     
     public typealias Element = (key: Key, value: Value)
     
     public mutating func next() -> Element? {
-        if let keyValuePair = current.keyValuePair {
-            current = current.next!
-            return keyValuePair
+        if _currentBucketOffset != -1 {
+            let currentBucketPtr = _cache._storage._withMutableBucket(at: _currentBucketOffset)
+            if let keyValuePair = currentBucketPtr[0].element {
+                _currentBucketOffset = currentBucketPtr[0].nextBucketOffset
+                return keyValuePair
+            }
         }
         return nil
     }
@@ -245,35 +220,5 @@ extension LRUCache {
     ///
     public var leastRecentlyUsedView: LRUCacheLeastRecentlyUsedView<Key, Value> {
         return LRUCacheLeastRecentlyUsedView(cache: self)
-    }
-}
-
-// MARK: - _Bucket
-
-internal class _Bucket<Key: Hashable, Value> {
-    internal weak var previous: _Bucket?
-    
-    internal var next: _Bucket?
-    
-    internal var keyValuePair: (key: Key, value: Value)!
-    
-    internal init(keyValuePair: (key: Key, value: Value)? = nil) {
-        self.keyValuePair = keyValuePair
-    }
-    
-    deinit {
-        var succeedingBuckets = [self]
-        
-        var current: _Bucket? = self
-        
-        while let next = current?.next {
-            succeedingBuckets.append(next)
-            current = next.next
-        }
-        
-        for each in succeedingBuckets.reversed() {
-            each.next = nil
-            each.previous = nil
-        }
     }
 }

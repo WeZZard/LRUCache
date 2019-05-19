@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		9C3AF098228F0DFA0018F6D7 /* _LRUCacheBucketStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C3AF097228F0DFA0018F6D7 /* _LRUCacheBucketStorage.swift */; };
+		9C3AF099228F0DFA0018F6D7 /* _LRUCacheBucketStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C3AF097228F0DFA0018F6D7 /* _LRUCacheBucketStorage.swift */; };
+		9C3AF09A228F0DFA0018F6D7 /* _LRUCacheBucketStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C3AF097228F0DFA0018F6D7 /* _LRUCacheBucketStorage.swift */; };
+		9C3AF09B228F0DFA0018F6D7 /* _LRUCacheBucketStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C3AF097228F0DFA0018F6D7 /* _LRUCacheBucketStorage.swift */; };
 		9C60013A225C79D300549226 /* LRUCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C600139225C79D300549226 /* LRUCache.swift */; };
 		9C60013B225C79D300549226 /* LRUCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C600139225C79D300549226 /* LRUCache.swift */; };
 		9C60013C225C79D300549226 /* LRUCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C600139225C79D300549226 /* LRUCache.swift */; };
@@ -20,6 +24,10 @@
 		9C600171225C86C400549226 /* _BucketTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C600170225C86C400549226 /* _BucketTests.swift */; };
 		9C600172225C86C400549226 /* _BucketTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C600170225C86C400549226 /* _BucketTests.swift */; };
 		9C600173225C86C400549226 /* _BucketTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C600170225C86C400549226 /* _BucketTests.swift */; };
+		9CE126B22291C35500042052 /* _LRUCacheBucket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CE126B12291C35500042052 /* _LRUCacheBucket.swift */; };
+		9CE126B32291C35500042052 /* _LRUCacheBucket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CE126B12291C35500042052 /* _LRUCacheBucket.swift */; };
+		9CE126B42291C35500042052 /* _LRUCacheBucket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CE126B12291C35500042052 /* _LRUCacheBucket.swift */; };
+		9CE126B52291C35500042052 /* _LRUCacheBucket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CE126B12291C35500042052 /* _LRUCacheBucket.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -47,6 +55,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		9C3AF097228F0DFA0018F6D7 /* _LRUCacheBucketStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = _LRUCacheBucketStorage.swift; sourceTree = "<group>"; };
 		9C600108225C796900549226 /* LRUCache.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = LRUCache.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		9C60010C225C796900549226 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		9C600116225C797900549226 /* LRUCache.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = LRUCache.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -59,6 +68,7 @@
 		9C600165225C7BD600549226 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		9C60016C225C7C3000549226 /* LRUCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LRUCacheTests.swift; sourceTree = "<group>"; };
 		9C600170225C86C400549226 /* _BucketTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = _BucketTests.swift; sourceTree = "<group>"; };
+		9CE126B12291C35500042052 /* _LRUCacheBucket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = _LRUCacheBucket.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -144,6 +154,8 @@
 			isa = PBXGroup;
 			children = (
 				9C600139225C79D300549226 /* LRUCache.swift */,
+				9C3AF097228F0DFA0018F6D7 /* _LRUCacheBucketStorage.swift */,
+				9CE126B12291C35500042052 /* _LRUCacheBucket.swift */,
 				9C60010C225C796900549226 /* Info.plist */,
 			);
 			path = LRUCache;
@@ -438,6 +450,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9CE126B22291C35500042052 /* _LRUCacheBucket.swift in Sources */,
+				9C3AF098228F0DFA0018F6D7 /* _LRUCacheBucketStorage.swift in Sources */,
 				9C60013A225C79D300549226 /* LRUCache.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -446,6 +460,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9CE126B32291C35500042052 /* _LRUCacheBucket.swift in Sources */,
+				9C3AF099228F0DFA0018F6D7 /* _LRUCacheBucketStorage.swift in Sources */,
 				9C60013B225C79D300549226 /* LRUCache.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -454,6 +470,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9CE126B42291C35500042052 /* _LRUCacheBucket.swift in Sources */,
+				9C3AF09A228F0DFA0018F6D7 /* _LRUCacheBucketStorage.swift in Sources */,
 				9C60013C225C79D300549226 /* LRUCache.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -462,6 +480,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9CE126B52291C35500042052 /* _LRUCacheBucket.swift in Sources */,
+				9C3AF09B228F0DFA0018F6D7 /* _LRUCacheBucketStorage.swift in Sources */,
 				9C60013D225C79D300549226 /* LRUCache.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
