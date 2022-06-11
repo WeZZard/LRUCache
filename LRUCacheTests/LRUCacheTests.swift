@@ -11,216 +11,279 @@ import XCTest
 import LRUCache
 
 class LRUCacheTests: XCTestCase {
-    var cache: LRUCache<String, Int>!
+  
+  var cache: LRUCache<String, Int>!
+  
+  override func setUp() {
+    super.setUp()
+    cache = LRUCache()
+  }
+  
+  override func tearDown() {
+    super.tearDown()
+    cache = nil
+  }
+  
+  // MARK: Insert Value for Key
+  
+  func testInsertValueForKey_updatesValues() {
+    let cache = LRUCache<String, Int>()
     
-    override func setUp() {
-        super.setUp()
-        cache = LRUCache()
-    }
+    XCTAssertEqualLeastRecentlyUsedView(cache.leastRecentlyUsedView, [])
     
-    override func tearDown() {
-        super.tearDown()
-        cache = nil
-    }
-	
-    // MARK: Insert Value for Key
-    func testInsertValueForKey_insertsValueForKey() {
-        let cache = LRUCache<String, Int>()
-        
-        cache.insertValue(0, forKey: "zero")
-        XCTAssertEqual(cache.value(forKey: "zero"), 0)
-    }
+    cache.insertValue(0, forKey: "zero")
     
-    func testInsertValueForKey_insertsBucket() {
-        let cache = LRUCache<String, Int>()
-        
-        XCTAssertTrue(cache._bucketsForKeys.isEmpty)
-        
-        cache.insertValue(0, forKey: "zero")
-        
-        XCTAssertFalse(cache._bucketsForKeys.isEmpty)
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketHead.next)
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketTail.previous)
-    }
+    XCTAssertEqualLeastRecentlyUsedView(
+      cache.leastRecentlyUsedView,
+      [("zero", 0)]
+    )
+  }
+  
+  func testInsertValueForKey_evictsValueIfNeeded() {
+    let cache = LRUCache<String, Int>(totalWeight: 10)
     
-    func testInsertValueForKey_insertsBucketRightAfterHead() {
-        let cache = LRUCache<String, Int>()
-        
-        cache.insertValue(0, forKey: "zero")
-        
-        XCTAssertFalse(cache._bucketsForKeys.isEmpty)
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketHead.next)
-        
-        cache.insertValue(1, forKey: "one")
-        
-        XCTAssertFalse(cache._bucketsForKeys.isEmpty)
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketHead.next!.next)
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketTail.previous)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketHead.next)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketTail.previous!.previous)
-    }
+    XCTAssertEqualLeastRecentlyUsedView(cache.leastRecentlyUsedView, [])
     
-    func testInsertValueForKey_evictsKeyValuePairs_whenStoredKeyValuePairsCountIsGoingToBeLargerThanMaxCount() {
-        let cache = LRUCache<String, Int>(maxCount: 1)
-        
-        cache.insertValue(0, forKey: "zero")
-        
-        XCTAssertFalse(cache._bucketsForKeys.isEmpty)
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketHead.next)
-        
-        cache.insertValue(1, forKey: "one")
-        
-        XCTAssertFalse(cache._bucketsForKeys.isEmpty)
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === nil)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketHead.next)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketTail.previous)
-    }
+    cache.insertValue(0, forKey: "zero", weight: 9)
     
-    // MARK: Value for Key
-    func testValueForKey_returnsValueForKey() {
-        let cache = LRUCache<String, Int>()
-        
-        cache.insertValue(0, forKey: "zero")
-        
-        XCTAssertEqual(cache.value(forKey: "zero"), 0)
-    }
+    XCTAssertEqualLeastRecentlyUsedView(
+      cache.leastRecentlyUsedView,
+      [("zero", 0)]
+    )
+    cache.insertValue(1, forKey: "one")
     
-    func testValueForKey_bumpsBucketRightAfterHead() {
-        let cache = LRUCache<String, Int>()
-        
-        cache.insertValue(0, forKey: "zero")
-        cache.insertValue(1, forKey: "one")
-        
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketHead.next!.next)
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketTail.previous)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketHead.next)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketTail.previous!.previous)
-        
-        cache.value(forKey: "zero")
-        
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketHead.next!.next)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketTail.previous)
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketHead.next)
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketTail.previous!.previous)
-    }
+    XCTAssertEqualLeastRecentlyUsedView(
+      cache.leastRecentlyUsedView,
+      [("one", 1), ("zero", 0)]
+    )
     
-    // MARK: Evict Value for Key
-    func testEvictValueForKey_evictsValueForKey() {
-        let cache = LRUCache<String, Int>()
-        
-        cache.insertValue(0, forKey: "zero")
-        cache.insertValue(1, forKey: "one")
-        
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketHead.next!.next)
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketTail.previous)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketHead.next)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketTail.previous!.previous)
-        
-        cache.evictValue(forKey: "zero")
-        
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === nil)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketHead.next)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketTail.previous)
-    }
+    cache.insertValue(2, forKey: "two")
+    
+    XCTAssertEqualLeastRecentlyUsedView(
+      cache.leastRecentlyUsedView,
+      [("two", 2), ("one", 1)]
+    )
+  }
+  
+  func testInsertValueForKey_updatesUsedWeight() {
+    let cache = LRUCache<String, Int>()
+    
+    XCTAssertEqual(cache.usedWeight, 0)
+    
+    cache.insertValue(0, forKey: "zero")
+    
+    XCTAssertEqual(cache.usedWeight, 1)
+    
+    cache.insertValue(0, forKey: "zero", weight: 10)
+    
+    XCTAssertEqual(cache.usedWeight, 10)
+  }
+  
+  func testInsertValueForKey_formsLeastRecentlyUsedView() {
+    let cache = LRUCache<String, Int>()
+    
+    XCTAssertEqualLeastRecentlyUsedView(cache.leastRecentlyUsedView, [])
+    
+    cache.insertValue(0, forKey: "zero")
+    
+    XCTAssertEqualLeastRecentlyUsedView(
+      cache.leastRecentlyUsedView,
+      [("zero", 0)]
+    )
+  }
+  
+  func testInsertValueForKey_updatesLeastRecentlyUsedView() {
+    let cache = LRUCache<String, Int>()
+    
+    XCTAssertEqualLeastRecentlyUsedView(cache.leastRecentlyUsedView, [])
+    
+    cache.insertValue(0, forKey: "zero")
+    cache.insertValue(1, forKey: "one")
+    
+    XCTAssertEqualLeastRecentlyUsedView(
+      cache.leastRecentlyUsedView,
+      [("one", 1), ("zero", 0)]
+    )
+    
+    cache.insertValue(0, forKey: "zero")
+    
+    XCTAssertEqualLeastRecentlyUsedView(
+      cache.leastRecentlyUsedView,
+      [("zero", 0), ("one", 1)]
+    )
+  }
+  
+  // MARK: Value for Key
+  func testValueForKey_returnsValueForKey() {
+    let cache = LRUCache<String, Int>()
+    
+    cache.insertValue(0, forKey: "zero")
+    
+    XCTAssertEqual(cache.value(forKey: "zero"), 0)
+  }
+  
+  func testValueForKey_updatesLeastRecentlyUsedView() {
+    let cache = LRUCache<String, Int>()
+    
+    cache.insertValue(0, forKey: "zero")
+    cache.insertValue(1, forKey: "one")
+    
+    XCTAssertEqualLeastRecentlyUsedView(
+      cache.leastRecentlyUsedView,
+      [("one", 1), ("zero", 0)]
+    )
+    
+    cache.value(forKey: "zero")
+    
+    XCTAssertEqualLeastRecentlyUsedView(
+      cache.leastRecentlyUsedView,
+      [("zero", 0), ("one", 1)]
+    )
+  }
+  
+  // MARK: Evict Value for Key
+  
+  func testEvictValueForKey_evictsValueForKey() {
+    let cache = LRUCache<String, Int>()
+    
+    cache.insertValue(0, forKey: "zero")
+    cache.insertValue(1, forKey: "one")
+    
+    XCTAssertEqualLeastRecentlyUsedView(
+      cache.leastRecentlyUsedView,
+      [("one", 1), ("zero", 0)]
+    )
+    
+    cache.evictValue(forKey: "zero")
+    
+    XCTAssertEqualLeastRecentlyUsedView(
+      cache.leastRecentlyUsedView,
+      [("one", 1)]
+    )
+  }
+  
+  
+  // MARK: Evict If Needed
+  func testEvictIfNeeded_evictsValue_whenUsedWeightIsLargerThanTotalWeight() {
+    let cache = LRUCache<String, Int>()
+    
+    cache.insertValue(0, forKey: "zero")
+    cache.insertValue(1, forKey: "one")
+    
+    XCTAssertEqualLeastRecentlyUsedView(
+      cache.leastRecentlyUsedView,
+      [("one", 1), ("zero", 0)]
+    )
+    
+    cache.totalWeight = 1
+    
+    XCTAssertEqualLeastRecentlyUsedView(
+      cache.leastRecentlyUsedView,
+      [("one", 1), ("zero", 0)]
+    )
+    
+    cache.evictIfNeeded()
+    
+    XCTAssertEqualLeastRecentlyUsedView(
+      cache.leastRecentlyUsedView,
+      [("one", 1)]
+    )
+    
+  }
+  
+  func testEvictIfNeeded_doesNotEvictsValue_whenUsedWeightIsEqualToTotalWeight() {
+    let cache = LRUCache<String, Int>()
+    
+    cache.insertValue(0, forKey: "zero")
+    cache.insertValue(1, forKey: "one")
+    
+    XCTAssertEqualLeastRecentlyUsedView(
+      cache.leastRecentlyUsedView,
+      [("one", 1), ("zero", 0)]
+    )
+    
+    cache.totalWeight = 2
+    
+    XCTAssertEqualLeastRecentlyUsedView(
+      cache.leastRecentlyUsedView,
+      [("one", 1), ("zero", 0)]
+    )
+    
+    cache.evictIfNeeded()
+    
+    XCTAssertEqualLeastRecentlyUsedView(
+      cache.leastRecentlyUsedView,
+      [("one", 1), ("zero", 0)]
+    )
+    
+  }
+  
+  func testEvictIfNeeded_doesNotEvictsValue_whenUsedWeightIsSmallerThanTotalWeight() {
+    let cache = LRUCache<String, Int>()
+    
+    cache.insertValue(0, forKey: "zero")
+    cache.insertValue(1, forKey: "one")
+    
+    XCTAssertEqualLeastRecentlyUsedView(
+      cache.leastRecentlyUsedView,
+      [("one", 1), ("zero", 0)]
+    )
+    
+    cache.totalWeight = 3
+    
+    XCTAssertEqualLeastRecentlyUsedView(
+      cache.leastRecentlyUsedView,
+      [("one", 1), ("zero", 0)]
+    )
+    
+    cache.evictIfNeeded()
+    
+    XCTAssertEqualLeastRecentlyUsedView(
+      cache.leastRecentlyUsedView,
+      [("one", 1), ("zero", 0)]
+    )
+    
+  }
+  
+  // MARK: Least-Recently Used View
+  
+  func testLeastRecentlyUsedView_returnsCacheStoredKeyValuePairsInLeastRecentlyUsedOrder() {
+    let cache = LRUCache<String, Int>()
+    
+    cache.insertValue(0, forKey: "zero")
+    cache.insertValue(1, forKey: "one")
+    
+    XCTAssertEqualLeastRecentlyUsedView(
+      cache.leastRecentlyUsedView,
+      [("one", 1), ("zero", 0)]
+    )
+    
+    cache.value(forKey: "zero")
     
     
-    // MARK: Evict If Needed
-    func testEvictIfNeeded_evictsValue_whenStoredKeyValuePairsCountIsLargerThanMaxCount() {
-        let cache = LRUCache<String, Int>()
-        
-        cache.insertValue(0, forKey: "zero")
-        cache.insertValue(1, forKey: "one")
-        
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketHead.next!.next)
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketTail.previous)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketHead.next)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketTail.previous!.previous)
-        
-        cache.maxCount = 1
-        
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketHead.next!.next)
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketTail.previous)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketHead.next)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketTail.previous!.previous)
-        
-        cache.evictIfNeeded()
-        
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === nil)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketHead.next)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketTail.previous)
+    XCTAssertEqualLeastRecentlyUsedView(
+      cache.leastRecentlyUsedView,
+      [("zero", 0), ("one", 1)]
+    )
+  }
+  
+  // MARK: Utilities
+  
+  func XCTAssertEqualLeastRecentlyUsedView<
+    View1: Sequence,
+    View2: Sequence,
+    Key: Hashable,
+    Value: Equatable
+  >(
+    _ lhs: View1,
+    _ rhs: View2,
+    file: StaticString = #file,
+    line: UInt = #line
+  ) where View1.Element == (key: Key, value: Value), View2.Element == (Key, Value) {
+    func compareElement(_ lhs: (Key, Value), _ rhs: (Key, Value)) -> Bool {
+      return lhs.0 == rhs.0 && lhs.1 == rhs.1
     }
-    
-    func testEvictIfNeeded_doesNotEvictsValue_whenStoredKeyValuePairsCountIsEqualToMaxCount() {
-        let cache = LRUCache<String, Int>()
-        
-        cache.insertValue(0, forKey: "zero")
-        cache.insertValue(1, forKey: "one")
-        
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketHead.next!.next)
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketTail.previous)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketHead.next)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketTail.previous!.previous)
-        
-        cache.maxCount = 2
-        
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketHead.next!.next)
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketTail.previous)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketHead.next)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketTail.previous!.previous)
-        
-        cache.evictIfNeeded()
-        
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketHead.next!.next)
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketTail.previous)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketHead.next)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketTail.previous!.previous)
-    }
-    
-    func testEvictIfNeeded_doesNotEvictsValue_whenStoredKeyValuePairsCountIsSmallerThanMaxCount() {
-        let cache = LRUCache<String, Int>()
-        
-        cache.insertValue(0, forKey: "zero")
-        cache.insertValue(1, forKey: "one")
-        
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketHead.next!.next)
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketTail.previous)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketHead.next)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketTail.previous!.previous)
-        
-        cache.maxCount = 3
-        
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketHead.next!.next)
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketTail.previous)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketHead.next)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketTail.previous!.previous)
-        
-        cache.evictIfNeeded()
-        
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketHead.next!.next)
-        XCTAssertTrue(cache._bucketsForKeys["zero"] === cache._bucketTail.previous)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketHead.next)
-        XCTAssertTrue(cache._bucketsForKeys["one"] === cache._bucketTail.previous!.previous)
-    }
-    
-    // MARK: Least-Recently Used View
-    func testLeastRecentlyUsedView_returnsCacheStoredKeyValuePairsInLeastRecentlyUsedOrder() {
-        let cache = LRUCache<String, Int>()
-        
-        cache.insertValue(0, forKey: "zero")
-        cache.insertValue(1, forKey: "one")
-        
-        var leastRecentlyUsedView = Array(cache.leastRecentlyUsedView)
-        XCTAssertEqual(leastRecentlyUsedView[0].key, "one")
-        XCTAssertEqual(leastRecentlyUsedView[0].value, 1)
-        XCTAssertEqual(leastRecentlyUsedView[1].key, "zero")
-        XCTAssertEqual(leastRecentlyUsedView[1].value, 0)
-        
-        cache.value(forKey: "zero")
-        
-        leastRecentlyUsedView = Array(cache.leastRecentlyUsedView)
-        XCTAssertEqual(leastRecentlyUsedView[0].key, "zero")
-        XCTAssertEqual(leastRecentlyUsedView[0].value, 0)
-        XCTAssertEqual(leastRecentlyUsedView[1].key, "one")
-        XCTAssertEqual(leastRecentlyUsedView[1].value, 1)
-    }
+    XCTAssertTrue(lhs.elementsEqual(rhs, by: compareElement), file: file, line: line)
+  }
+  
 }

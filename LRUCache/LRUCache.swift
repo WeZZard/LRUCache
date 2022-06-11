@@ -10,167 +10,174 @@
 /// A Least-Recently Used Cache. Not thread-safe.
 ///
 public class LRUCache<Key: Hashable, Value> {
-    internal var _bucketHead: _Bucket<Key, Value>
-    internal var _bucketTail: _Bucket<Key, Value>
-    
-    internal var _bucketsForKeys: [Key : _Bucket<Key, Value>]
-    
-    /// The max key-value pairs can be stored in this cache. `0` means no
-    /// limit.
-    ///
-    public var maxCount: Int
-    
-    public init(maxCount: Int = 0) {
-        self.maxCount = maxCount
-        _bucketHead = .init()
-        _bucketTail = .init()
-        _bucketHead.next = _bucketTail
-        _bucketTail.previous = _bucketHead
-        _bucketsForKeys = [:]
+  
+  fileprivate var head: LRUBucket<Key, Value>
+  
+  fileprivate var tail: LRUBucket<Key, Value>
+  
+  fileprivate var bucketsForKeys: [Key : LRUBucket<Key, Value>]
+  
+  /// The max key-value pairs can be stored in this cache. `0` means no
+  /// limit.
+  ///
+  public var totalWeight: Int
+  
+  public private(set) var usedWeight: Int
+  
+  /// Initializes an `LRUCache` instance.
+  ///
+  /// - Parameter totalWeight: The max key-value pairs can be stored in this
+  /// cache. `0` means no limit.
+  ///
+  public init(totalWeight: Int = 0) {
+    self.totalWeight = totalWeight
+    self.usedWeight = 0
+    self.head = .init()
+    self.tail = .init()
+    self.head.next = tail
+    self.tail.previous = head
+    self.bucketsForKeys = [:]
+  }
+  
+  /// Inserts a `value` for `key` to the cache. Returns the old value
+  /// if there is.
+  ///
+  /// - Parameter value: The value to be inserted.
+  ///
+  /// - Parameter key: The key of the inserted value.
+  ///
+  /// - Parameter weight: The weight of the inserted value. `nil` for `1`.
+  ///
+  /// - Returns: The old value of the `key` if there is.
+  ///
+  /// Inserting values which have already been in cache with same keys
+  /// makes the cache delays the eviction of those key-value pairs (If
+  /// `maxCount` is larger than 0).
+  ///
+  @discardableResult
+  public func insertValue(
+    _ value: Value,
+    forKey key: Key,
+    weight weightOrNil: Int? = nil
+  ) -> Value? {
+    let newWeight = checkedWeight(weightOrNil)
+    var oldValue: Value?
+    if let _bucket = bucketsForKeys[key] {
+      oldValue = _bucket.contents.value
+      _removeBucket(_bucket)
+      _bucket.contents = (key, value, newWeight)
+      _insertBucket(_bucket)
+    } else {
+      let _bucket = LRUBucket(contents: (key, value, newWeight))
+      bucketsForKeys[key] = _bucket
+      _insertBucket(_bucket)
+    }
+    evictIfNeeded()
+    return oldValue
+  }
+  
+  /// Evicts a `value` for `key` in the cache.
+  ///
+  /// - Parameter key: The key of the value to be evicted.
+  ///
+  /// - Returns: The evicted value if the cache contains a paired value
+  /// for `key`.
+  ///
+  @discardableResult
+  public func evictValue(forKey key: Key) -> Value? {
+    guard let bucket = bucketsForKeys[key] else {
+      return nil
+    }
+    bucketsForKeys[key] = nil
+    _removeBucket(bucket)
+    return bucket.contents.value
+  }
+  
+  /// Returns a value for `key` in the cache.
+  ///
+  /// - Parameter key: The key of the value to be evicted.
+  ///
+  /// - Returns: The value if the cache contains a paired value for
+  /// `key`.
+  ///
+  /// Accessing values for keys with this function would delay the
+  /// eviction of the paired value of `key` (If `maxCount` is larger
+  /// than 0).
+  ///
+  @discardableResult
+  public func value(forKey key: Key) -> Value? {
+    guard let bucket = bucketsForKeys[key] else {
+      return nil
+    }
+    _removeBucket(bucket)
+    _insertBucket(bucket)
+    return bucket.contents.value
+  }
+  
+  /// Evicts key-value pairs until the stored key-value pairs are less
+  /// than `maxCount`.
+  ///
+  public func evictIfNeeded() {
+    guard totalWeight > 0 else {
+      return
     }
     
-    /// Inserts a `value` for `key` to the cache. Returns the old value
-    /// if there is.
-    ///
-    /// - Parameter value: The value to be inserted.
-    ///
-    /// - Parameter key: The key of the inserted value.
-    ///
-    /// - Returns: The old value of the `key` if there is.
-    ///
-    /// Inserting values which have already been in cache with same keys
-    /// makes the cache delays the eviction of those key-value pairs (If
-    /// `maxCount` is larger than 0).
-    ///
-    @discardableResult
-    public func insertValue(_ value: Value, forKey key: Key) -> Value? {
-        var oldValue: Value?
-        if let _bucket = _bucketsForKeys[key] {
-            oldValue = _bucket.keyValuePair.value
-            _bucket.keyValuePair = (key, value)
-            _removeBucket(_bucket)
-            _insertBucket(_bucket)
-        } else {
-            let _bucket = _Bucket(keyValuePair: (key, value))
-            _bucketsForKeys[key] = _bucket
-            _insertBucket(_bucket)
-        }
-        evictIfNeeded()
-        return oldValue
+    while usedWeight > totalWeight {
+      let mostNotUsedBucket = tail.previous!
+      _removeBucket(mostNotUsedBucket)
+      bucketsForKeys[mostNotUsedBucket.contents.key] = nil
     }
+  }
+  
+  internal func _insertBucket(_ bucket: LRUBucket<Key, Value>) {
+    usedWeight += bucket.contents.weight
     
-    /// Evicts a `value` for `key` in the cache.
-    ///
-    /// - Parameter key: The key of the value to be evicted.
-    ///
-    /// - Returns: The evicted value if the cache contains a paired value
-    /// for `key`.
-    ///
-    @discardableResult
-    public func evictValue(forKey key: Key) -> Value? {
-        if let _bucket = _bucketsForKeys[key] {
-            _bucketsForKeys[key] = nil
-            _removeBucket(_bucket)
-            return _bucket.keyValuePair.value
-        }
-        return nil
+    let currentFirstBucket = head.next!
+    
+    head.next = bucket
+    bucket.previous = head
+    
+    bucket.next = currentFirstBucket
+    currentFirstBucket.previous = bucket
+  }
+  
+  internal func _removeBucket(_ bucket: LRUBucket<Key, Value>) {
+    usedWeight -= bucket.contents.weight
+    
+    let previous = bucket.previous!
+    
+    let next = bucket.next!
+    
+    previous.next = next
+    next.previous = previous
+    
+    bucket.next = nil
+    bucket.previous = nil
+  }
+  
+  @inline(__always)
+  private func checkedWeight(_ weight: Int?) -> Int {
+    if let weight = weight {
+      precondition(weight >= 0)
+      return weight
+    } else {
+      return 1
     }
-    
-    /// Returns a value for `key` in the cache.
-    ///
-    /// - Parameter key: The key of the value to be evicted.
-    ///
-    /// - Returns: The value if the cache contains a paired value for
-    /// `key`.
-    ///
-    /// Accessing values for keys with this function would delay the
-    /// eviction of the paired value of `key` (If `maxCount` is larger
-    /// than 0).
-    ///
-    @discardableResult
-    public func value(forKey key: Key) -> Value? {
-        if let _bucket = _bucketsForKeys[key] {
-            _removeBucket(_bucket)
-            _insertBucket(_bucket)
-            return _bucket.keyValuePair.value
-        }
-        return nil
-    }
-    
-    /// Evicts key-value pairs until the stored key-value pairs are less
-    /// than `maxCount`.
-    ///
-    public func evictIfNeeded() {
-        guard maxCount > 0 else { return }
-        
-        while _bucketsForKeys.count > maxCount {
-            let _bucket = _bucketTail.previous!
-            _removeBucket(_bucket)
-            _bucketsForKeys[_bucket.keyValuePair.key] = nil
-        }
-    }
-    
-    internal func _insertBucket(_ bucket: _Bucket<Key, Value>) {
-        let currentFirstBucket = _bucketHead.next!
-        
-        _bucketHead.next = bucket
-        bucket.previous = _bucketHead
-        
-        bucket.next = currentFirstBucket
-        currentFirstBucket.previous = bucket
-    }
-    
-    internal func _removeBucket(_ bucket: _Bucket<Key, Value>) {
-        let previous = bucket.previous!
-        
-        let next = bucket.next!
-        
-        previous.next = next
-        next.previous = previous
-        
-        bucket.next = nil
-        bucket.previous = nil
-    }
-}
-
-// MARK: Collection
-
-public struct LRUCacheIndex<Key: Hashable, Value>: Comparable, Hashable {
-    internal let _impl: DictionaryIndex<Key, _Bucket<Key, Value>>
-    
-    internal init(impl: DictionaryIndex<Key, _Bucket<Key, Value>>) {
-        _impl = impl
-    }
-    
-    public static func < (lhs: LRUCacheIndex, rhs: LRUCacheIndex) -> Bool {
-        return lhs._impl < rhs._impl
-    }
-}
-
-extension LRUCache: Collection {
-    public typealias Index = LRUCacheIndex<Key, Value>
-    
-    public typealias Element = (key: Key, value: Value)
-    
-    public var startIndex: Index {
-        return LRUCacheIndex(impl: _bucketsForKeys.startIndex)
-    }
-    
-    public var endIndex: Index {
-        return LRUCacheIndex(impl: _bucketsForKeys.endIndex)
-    }
-    
-    public func index(after i: Index) -> Index {
-        return Index(impl: _bucketsForKeys.index(after: i._impl))
-    }
-    
-    public subscript(index: Index) -> Element {
-        let (_, bucket) = _bucketsForKeys[index._impl]
-        return bucket.keyValuePair
-    }
+  }
 }
 
 // MARK: Least-Recently Used View
+
+extension LRUCache {
+  
+  /// Returns a view of the cache which is a sequence of the stored
+  /// key-value pairs arranged in least-recently used order.
+  ///
+  public var leastRecentlyUsedView: LRUCacheLeastRecentlyUsedView<Key, Value> {
+    return LRUCacheLeastRecentlyUsedView(cache: self)
+  }
+  
+}
 
 /// The least-recently used view of an `LRUCache` instance.
 ///
@@ -187,7 +194,7 @@ extension LRUCache: Collection {
 /// returns `[1, 0]`, but it returns `[0, 1]`.
 ///
 /// ```
-/// let cache = LRUCache<String, Int>(maxCount: 10)
+/// let cache = LRUCache<String, Int>(totalWeight: 10)
 ///
 /// cache.insertValue(0, forKey: "zero")
 ///
@@ -201,79 +208,72 @@ extension LRUCache: Collection {
 /// ```
 ///
 public struct LRUCacheLeastRecentlyUsedView<Key: Hashable, Value>: Sequence {
-    internal let _cache: LRUCache<Key, Value>
-    
-    public init(cache: LRUCache<Key, Value>) {
-        _cache = cache
-    }
-    
-    public typealias Iterator = LRUCacheLeastRecentlyUsedViewIterator<Key, Value>
-    
-    public __consuming func makeIterator() -> Iterator {
-        return Iterator(cache: _cache)
-    }
+  
+  private let cache: LRUCache<Key, Value>
+  
+  public init(cache: LRUCache<Key, Value>) {
+    self.cache = cache
+  }
+  
+  public typealias Iterator = LRUCacheLeastRecentlyUsedViewIterator<Key, Value>
+  
+  public __consuming func makeIterator() -> Iterator {
+    return Iterator(cache: cache)
+  }
 }
 
 /// The least-recently used view iterator of an `LRUCache` instance.
 ///
 public struct LRUCacheLeastRecentlyUsedViewIterator<Key: Hashable, Value>:
-    IteratorProtocol
+  IteratorProtocol
 {
-    internal let _cache: LRUCache<Key, Value>
-    
-    internal unowned var current: _Bucket<Key, Value>
-    
-    public init(cache: LRUCache<Key, Value>) {
-        _cache = cache
-        current = _cache._bucketHead.next!
+  
+  internal let cache: LRUCache<Key, Value>
+  
+  internal unowned var current: LRUBucket<Key, Value>
+  
+  public init(cache: LRUCache<Key, Value>) {
+    self.cache = cache
+    self.current = cache.head.next!
+  }
+  
+  public typealias Element = (key: Key, value: Value)
+  
+  public mutating func next() -> Element? {
+    guard let (key, value, _) = current.contents else {
+      return nil
     }
-    
-    public typealias Element = (key: Key, value: Value)
-    
-    public mutating func next() -> Element? {
-        if let keyValuePair = current.keyValuePair {
-            current = current.next!
-            return keyValuePair
-        }
-        return nil
-    }
-}
-
-extension LRUCache {
-    /// Returns a view of the cache which is a sequence of the stored
-    /// key-value pairs arranged in least-recently used order.
-    ///
-    public var leastRecentlyUsedView: LRUCacheLeastRecentlyUsedView<Key, Value> {
-        return LRUCacheLeastRecentlyUsedView(cache: self)
-    }
+    current = current.next!
+    return (key, value)
+  }
 }
 
 // MARK: - _Bucket
 
-internal class _Bucket<Key: Hashable, Value> {
-    internal weak var previous: _Bucket?
+internal class LRUBucket<Key: Hashable, Value> {
+  
+  internal weak var previous: LRUBucket?
+  
+  internal var next: LRUBucket?
+  
+  internal var contents: (key: Key, value: Value, weight: Int)!
+  
+  internal init(contents: (key: Key, value: Value, weight: Int)? = nil) {
+    self.contents = contents
+  }
+  
+  deinit {
+    var endOrNil: LRUBucket? = self
     
-    internal var next: _Bucket?
-    
-    internal var keyValuePair: (key: Key, value: Value)!
-    
-    internal init(keyValuePair: (key: Key, value: Value)? = nil) {
-        self.keyValuePair = keyValuePair
+    while let next = endOrNil?.next {
+      endOrNil = next.next
     }
     
-    deinit {
-        var succeedingBuckets = [self]
-        
-        var current: _Bucket? = self
-        
-        while let next = current?.next {
-            succeedingBuckets.append(next)
-            current = next.next
-        }
-        
-        for each in succeedingBuckets.reversed() {
-            each.next = nil
-            each.previous = nil
-        }
+    while let end = endOrNil {
+      end.previous?.next = nil
+      endOrNil = end.previous
+      end.previous = nil
     }
+  }
+  
 }
